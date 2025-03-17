@@ -1,1 +1,5 @@
-
+fastapi[standard]
+requests
+openai
+elevenlabs
+redis
