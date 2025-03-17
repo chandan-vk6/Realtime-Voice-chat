@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time Voice AI Assistant</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/recordrtc@5.6.2/RecordRTC.min.js"></script>
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Real-time Voice AI Assistant</h1>
+        </header>
+        
+        <div class="main-content">
+            <div class="controls-panel">
+                <h2>Controls</h2>
+                <div class="recording-controls">
+                    <button id="startRecording" class="btn primary">Start Recording</button>
+                    <button id="stopRecording" class="btn warning" disabled>Stop & Process</button>
+                    <button id="clearConversation" class="btn secondary">Clear Conversation</button>
+                </div>
+                <div class="recording-status">
+                    <div id="statusIndicator" class="status-indicator"></div>
+                    <span id="statusText">Not recording</span>
+                </div>
+                <div class="visualization">
+                    <canvas id="audioVisualization"></canvas>
+                </div>
+            </div>
+            
+            <div class="conversation-panel">
+                <h2>Conversation</h2>
+                <div id="conversationContainer" class="conversation-container">
+                    <!-- Conversation messages will be displayed here -->
+                </div>
+
+                <div id="filePreview" class="file-preview-above"></div>
+                
+                <div class="text-input-container">
+                    <div class="file-upload-wrapper">
+                        <!-- Local file upload -->
+                        <label for="fileUpload" class="file-upload-label">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"></path>
+                            </svg>
+                        </label>
+                        <input type="file" id="fileUpload" class="file-upload-input" multiple>
+                        
+                        <!-- Google Drive upload -->
+                        <label id="googleDriveUpload" class="file-upload-label google-drive-label">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/1/12/Google_Drive_icon_%282020%29.svg" alt="Google Drive" width="24" height="24">
+                        </label>
+                        
+
+                        
+                        
+                    </div>
+                    
+                    <input type="text" id="textInput" placeholder="Type your message here...">
+                    <button id="sendText" class="btn primary">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <audio id="audioPlayer" style="display: none;"></audio>
+    
+    <script src="/static/app.js"></script>
+    
+    <!-- JavaScript for handling structured AI messages and animations -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize typing indicator
+            function createTypingIndicator() {
+                const typingIndicator = document.createElement('div');
+                typingIndicator.className = 'typing-indicator';
+                
+                const typingDots = document.createElement('div');
+                typingDots.className = 'typing-dots';
+                
+                for (let i = 0; i < 3; i++) {
+                    const dot = document.createElement('div');
+                    dot.className = 'typing-dot';
+                    typingDots.appendChild(dot);
+                }
+                
+                typingIndicator.appendChild(typingDots);
+                return typingIndicator;
+            }
+            
+            // Original addMessage function (to be modified in your app.js)
+            const originalAddMessage = window.addMessage || function() {};
+            
+            // Override the addMessage function to add formatting
+            window.addMessage = function(text, isUser) {
+                const container = document.getElementById('conversationContainer');
+                const message = document.createElement('div');
+                message.className = isUser ? 'message user-message' : 'message assistant-message';
+                
+                if (!isUser) {
+                    // Show typing indicator first
+                    const typingIndicator = createTypingIndicator();
+                    container.appendChild(typingIndicator);
+                    container.scrollTop = container.scrollHeight;
+                    
+                    // Format AI response with proper structure
+                    setTimeout(() => {
+                        container.removeChild(typingIndicator);
+                        
+                        // Process the text for structured formatting
+                        const formattedText = formatAIResponse(text);
+                        message.innerHTML = formattedText;
+                        
+                        container.appendChild(message);
+                        container.scrollTop = container.scrollHeight;
+                        
+                        // Add copy buttons to code blocks
+                        addCopyButtonsToCodeBlocks();
+                    }, 1500); // Simulated typing delay
+                    
+                    return;
+                }
+                
+                // For user messages (no special formatting needed)
+                message.textContent = text;
+                container.appendChild(message);
+                container.scrollTop = container.scrollHeight;
+            };
+            
+            // Format AI response with proper structure
+            function formatAIResponse(text) {
+                // Convert plain text to HTML with structure
+                // This is a simple example - extend as needed
+                let formatted = text
+                    // Convert markdown headers
+                    .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+                    .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+                    // Convert markdown lists
+                    .replace(/^\* (.*$)/gm, '<li>$1</li>')
+                    .replace(/^(\d+)\. (.*$)/gm, '<li>$2</li>')
+                    // Convert code blocks
+                    .replace(/```(\w+)?\n([\s\S]*?)```/gm, function(match, lang, code) {
+                        const language = lang || 'text';
+                        return `<div class="code-block">
+                                  <div class="code-header">
+                                    <span>${language}</span>
+                                    <button class="copy-button" onclick="copyCode(this)">
+                                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                        <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
+                                      </svg>
+                                      Copy
+                                    </button>
+                                  </div>
+                                  <pre><code>${code}</code></pre>
+                                </div>`;
+                    })
+                    // Convert inline code
+                    .replace(/`([^`]+)`/g, '<code>$1</code>')
+                    // Convert paragraphs (line breaks)
+                    .replace(/\n\n/g, '</p><p>')
+                    // Convert single line breaks
+                    .replace(/\n/g, '<br>');
+                
+                // Wrap with paragraph if not already
+                if (!formatted.startsWith('<')) {
+                    formatted = '<p>' + formatted + '</p>';
+                }
+                
+                // Fix any list items that should be in lists
+                if (formatted.includes('<li>')) {
+                    formatted = formatted.replace(/<li>(.*?)<\/li>/g, function(match) {
+                        if (!match.includes('<ul>')) {
+                            return '<ul>' + match + '</ul>';
+                        }
+                        return match;
+                    });
+                    // Clean up nested lists
+                    formatted = formatted.replace(/<\/ul><ul>/g, '');
+                }
+                
+                return formatted;
+            }
+            
+            // Add copy functionality to code blocks
+            function addCopyButtonsToCodeBlocks() {
+                document.querySelectorAll('.copy-button').forEach(button => {
+                    button.addEventListener('click', function() {
+                        const codeBlock = this.closest('.code-block').querySelector('code');
+                        const textToCopy = codeBlock.textContent;
+                        
+                        navigator.clipboard.writeText(textToCopy).then(() => {
+                            // Update button text temporarily
+                            const originalText = this.innerHTML;
+                            this.innerHTML = `
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                                Copied!
+                            `;
+                            
+                            setTimeout(() => {
+                                this.innerHTML = originalText;
+                            }, 2000);
+                        });
+                    });
+                });
+            }
+            
+            // Make copyCode function globally available
+            window.copyCode = function(button) {
+                const codeBlock = button.closest('.code-block').querySelector('code');
+                const textToCopy = codeBlock.textContent;
+                
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                    // Update button text temporarily
+                    const originalText = button.innerHTML;
+                    button.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                        Copied!
+                    `;
+                    
+                    setTimeout(() => {
+                        button.innerHTML = originalText;
+                    }, 2000);
+                });
+            };
+            
+        });
+    </script>
+</body>
+</html>
